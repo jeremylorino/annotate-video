@@ -3,13 +3,19 @@ import React, { Component } from 'react';
 import './App.scss';
 
 import ReactPlayer from 'react-player';
-import { format as durationFormat } from './Duration';
+import Duration, { format as durationFormat } from './Duration';
 
 import { Cell, Grid, Row } from '@material/react-layout-grid';
 import TextField, { HelperText, Input } from '@material/react-text-field';
-import { Button } from '@material/react-button';
+import Button from '@material/react-button';
+import IconButton from '@material/react-icon-button';
 import MaterialIcon from '@material/react-material-icon';
-import List, { ListItem, ListItemText } from '@material/react-list';
+import List, {
+  ListItem,
+  ListItemText,
+  ListItemMeta
+} from '@material/react-list';
+import LinearProgress from '@material/react-linear-progress';
 
 class App extends Component {
   state = {
@@ -19,20 +25,25 @@ class App extends Component {
     duration: 0,
     seeking: null,
     played: 0,
+    loaded: 0,
     value: '',
     selectedIndex: null,
     annotatedList: [
       {
         primaryText: 'stretching',
-        secondaryText: '50'
+        timestamp: 50
       },
       {
         primaryText: 'smelling flowers',
-        secondaryText: '75'
+        timestamp: 75
       },
       {
         primaryText: 'looking at tree',
-        secondaryText: '90'
+        timestamp: 90
+      },
+      {
+        primaryText: 'squirrel in the headlights',
+        timestamp: 336
       }
     ]
   };
@@ -82,11 +93,17 @@ class App extends Component {
     const { annotatedList, value } = this.state;
     const data = {
       primaryText: value,
-      secondaryText: this.player.getCurrentTime()
+      timestamp: this.player.getCurrentTime()
     };
     console.log('onAnnotate', data);
     annotatedList.push(data);
-    this.setState({ annotatedList });
+    this.setState({ annotatedList, value: '' });
+  };
+
+  handleSelect = selectedIndex => {
+    const { annotatedList } = this.state;
+    this.player.seekTo(annotatedList[selectedIndex].timestamp);
+    this.setState({ selectedIndex });
   };
 
   ref = player => {
@@ -94,7 +111,15 @@ class App extends Component {
   };
 
   render() {
-    const { url, playing, annotatedList, selectedIndex } = this.state;
+    const {
+      url,
+      playing,
+      annotatedList,
+      selectedIndex,
+      loaded,
+      played,
+      duration
+    } = this.state;
     return (
       <Grid>
         <Row>
@@ -124,19 +149,19 @@ class App extends Component {
                 <List
                   singleSelection
                   selectedIndex={selectedIndex}
-                  handleSelect={selectedIndex => {
-                    this.player.seekTo(
-                      parseFloat(annotatedList[selectedIndex].secondaryText)
-                    );
-                    this.setState({ selectedIndex });
-                  }}
+                  handleSelect={this.handleSelect}
                 >
                   {annotatedList.map((v, i) => {
                     return (
                       <ListItem key={i}>
                         <ListItemText
                           primaryText={v.primaryText}
-                          secondaryText={durationFormat(v.secondaryText)}
+                          secondaryText={durationFormat(v.timestamp)}
+                        />
+                        <ListItemMeta
+                          meta={`${((v.timestamp / duration) * 100).toFixed(
+                            2
+                          )}%`}
                         />
                       </ListItem>
                     );
@@ -146,22 +171,59 @@ class App extends Component {
             </Row>
           </Cell>
           <Cell columns={12 - 4}>
-            <ReactPlayer
-              ref={this.ref}
-              controls={true}
-              url={url}
-              playing={playing}
-              onReady={() => console.log('onReady')}
-              onStart={() => console.log('onStart')}
-              onPlay={this.handlePlay}
-              onPause={this.handlePause}
-              onBuffer={() => console.log('onBuffer')}
-              onSeek={e => console.log('onSeek', e)}
-              onEnded={this.handleEnded}
-              onError={e => console.log('onError', e)}
-              onProgress={this.handleProgress}
-              onDuration={this.handleDuration}
-            />
+            <Row>
+              <Cell columns={12}>
+                <ReactPlayer
+                  ref={this.ref}
+                  controls={true}
+                  url={url}
+                  playing={playing}
+                  onReady={() => console.log('onReady')}
+                  onStart={() => console.log('onStart')}
+                  onPlay={this.handlePlay}
+                  onPause={this.handlePause}
+                  onBuffer={() => console.log('onBuffer')}
+                  onSeek={e => console.log('onSeek', e)}
+                  onEnded={this.handleEnded}
+                  onError={e => console.log('onError', e)}
+                  onProgress={this.handleProgress}
+                  onDuration={this.handleDuration}
+                />
+              </Cell>
+              <Cell columns={12}>
+                <Duration seconds={duration}></Duration>
+                <LinearProgress
+                  bufferingDots={false}
+                  buffer={loaded}
+                  progress={played}
+                  style={{ width: '640px' }}
+                />
+                <div style={{ width: '640px' }}>
+                  {annotatedList.map((v, i) => {
+                    const position = (v.timestamp / duration).toFixed(2);
+                    return (
+                      <IconButton
+                        key={i}
+                        title={v.primaryText}
+                        onClick={() => {
+                          return this.handleSelect(i);
+                        }}
+                        style={{
+                          position: 'absolute',
+                          transform: `translateX(${position * 640 - 22}px)`
+                        }}
+                      >
+                        <MaterialIcon
+                          icon={
+                            selectedIndex === i ? 'bookmark' : 'bookmark_border'
+                          }
+                        />
+                      </IconButton>
+                    );
+                  })}
+                </div>
+              </Cell>
+            </Row>
           </Cell>
         </Row>
       </Grid>
