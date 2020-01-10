@@ -31,19 +31,27 @@ class App extends Component {
     annotatedList: [
       {
         primaryText: 'stretching',
-        timestamp: 50
+        timestamp: 50,
+        durationBefore: 0,
+        durationAfter: 0
       },
       {
         primaryText: 'smelling flowers',
-        timestamp: 75
+        timestamp: 75,
+        durationBefore: 0,
+        durationAfter: 0
       },
       {
         primaryText: 'looking at tree',
-        timestamp: 90
+        timestamp: 90,
+        durationBefore: 0,
+        durationAfter: 0
       },
       {
         primaryText: 'squirrel in the headlights',
-        timestamp: 336
+        timestamp: 336,
+        durationBefore: 0,
+        durationAfter: 0
       }
     ]
   };
@@ -123,6 +131,67 @@ class App extends Component {
     return (
       <Grid>
         <Row>
+          <Cell columns={12}>
+            <ReactPlayer
+              width="100%"
+              ref={this.ref}
+              controls={true}
+              url={url}
+              playing={playing}
+              onReady={() => console.log('onReady')}
+              onStart={() => console.log('onStart')}
+              onPlay={this.handlePlay}
+              onPause={this.handlePause}
+              onBuffer={() => console.log('onBuffer')}
+              onSeek={e => console.log('onSeek', e)}
+              onEnded={this.handleEnded}
+              onError={e => console.log('onError', e)}
+              onProgress={this.handleProgress}
+              onDuration={this.handleDuration}
+            />
+            <IconButton
+              style={{
+                position: 'absolute',
+                color: 'yellow',
+                top: '1px'
+              }}
+            >
+              <MaterialIcon icon="bookmark" />
+            </IconButton>
+          </Cell>
+          <Cell columns={12}>
+            <Duration seconds={duration}></Duration>
+            <LinearProgress
+              bufferingDots={false}
+              buffer={loaded}
+              progress={played}
+              style={{ width: '640px' }}
+            />
+            <div style={{ width: '640px', minHeight: '28px' }}>
+              {annotatedList.map((v, i) => {
+                const position = (v.timestamp / duration).toFixed(2);
+                return (
+                  <IconButton
+                    key={i}
+                    title={v.primaryText}
+                    onClick={() => {
+                      return this.handleSelect(i);
+                    }}
+                    style={{
+                      position: 'absolute',
+                      transform: `translateX(${position * 640 - 22}px)`
+                    }}
+                  >
+                    <MaterialIcon
+                      icon={
+                        selectedIndex === i ? 'bookmark' : 'bookmark_border'
+                      }
+                    />
+                  </IconButton>
+                );
+              })}
+            </div>
+          </Cell>
           <Cell columns={4}>
             <Row>
               <Cell columns={12}>
@@ -167,61 +236,6 @@ class App extends Component {
                     );
                   })}
                 </List>
-              </Cell>
-            </Row>
-          </Cell>
-          <Cell columns={12 - 4}>
-            <Row>
-              <Cell columns={12}>
-                <ReactPlayer
-                  ref={this.ref}
-                  controls={true}
-                  url={url}
-                  playing={playing}
-                  onReady={() => console.log('onReady')}
-                  onStart={() => console.log('onStart')}
-                  onPlay={this.handlePlay}
-                  onPause={this.handlePause}
-                  onBuffer={() => console.log('onBuffer')}
-                  onSeek={e => console.log('onSeek', e)}
-                  onEnded={this.handleEnded}
-                  onError={e => console.log('onError', e)}
-                  onProgress={this.handleProgress}
-                  onDuration={this.handleDuration}
-                />
-              </Cell>
-              <Cell columns={12}>
-                <Duration seconds={duration}></Duration>
-                <LinearProgress
-                  bufferingDots={false}
-                  buffer={loaded}
-                  progress={played}
-                  style={{ width: '640px' }}
-                />
-                <div style={{ width: '640px' }}>
-                  {annotatedList.map((v, i) => {
-                    const position = (v.timestamp / duration).toFixed(2);
-                    return (
-                      <IconButton
-                        key={i}
-                        title={v.primaryText}
-                        onClick={() => {
-                          return this.handleSelect(i);
-                        }}
-                        style={{
-                          position: 'absolute',
-                          transform: `translateX(${position * 640 - 22}px)`
-                        }}
-                      >
-                        <MaterialIcon
-                          icon={
-                            selectedIndex === i ? 'bookmark' : 'bookmark_border'
-                          }
-                        />
-                      </IconButton>
-                    );
-                  })}
-                </div>
               </Cell>
             </Row>
           </Cell>
