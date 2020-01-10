@@ -2,8 +2,8 @@ import React, { Component } from 'react';
 
 import './App.scss';
 
-import ReactPlayer from 'react-player';
 import Duration, { format as durationFormat } from './Duration';
+import { VideoPlayer } from './components/VideoPlayer';
 
 import { Cell, Grid, Row } from '@material/react-layout-grid';
 import TextField, { HelperText, Input } from '@material/react-text-field';
@@ -22,17 +22,8 @@ class App extends Component {
     super(props);
 
     this.state = {
-      doc: {
-        id: null,
-        data: () => {
-          return { url: null, annotatedList: [] };
-        }
-      },
-      playing: false,
-      duration: 0,
-      seeking: null,
-      played: 0,
-      loaded: 0,
+      doc: null,
+      loaded: false,
       value: '',
       selectedIndex: null
     };
@@ -40,12 +31,12 @@ class App extends Component {
     const { firebase } = this.props;
     const db = firebase.db;
 
-    db.doc('videos/F1v1YAxhPxPrNLSiaspK').onSnapshot(doc => {
+    db.doc('videos/mC5h7yldgnk0nFyk8b1D').onSnapshot(doc => {
       console.log(`${doc.id} =>`, doc.data());
       this.setState({
         doc,
         url: doc.data().url,
-        annotatedList: doc.data().annotatedList
+        annotatedList: doc.data().annotatedList || []
       });
     });
   }
@@ -55,57 +46,19 @@ class App extends Component {
   }
 
   get url() {
-    return this.state.doc.data().url;
+    return this.state.url;
   }
 
   get annotatedList() {
-    const { annotatedList } = this.state.doc.data();
-    return annotatedList.sort((a, b) => a.timestamp - b.timestamp);
+    const { annotatedList } = this.state;
+    return (annotatedList || []).sort((a, b) => a.timestamp - b.timestamp);
   }
 
-  handlePlay = () => {
-    // console.log('onPlay');
-    this.setState({ playing: true });
-  };
-
-  handlePause = () => {
-    // console.log('onPause');
-    this.setState({ playing: false });
-  };
-
-  handleSeekMouseDown = e => {
-    this.setState({ seeking: true });
-  };
-
-  handleSeekChange = e => {
-    this.setState({ played: parseFloat(e.target.value) });
-  };
-
-  handleSeekMouseUp = e => {
-    this.setState({ seeking: false });
-    this.player.seekTo(parseFloat(e.target.value));
-  };
-
-  handleProgress = state => {
-    // console.log('onProgress', state);
-    // We only want to update time slider if we are not currently seeking
-    if (!this.state.seeking) {
-      this.setState(state);
-    }
-  };
-
-  handleEnded = () => {
-    // console.log('onEnded');
-    this.setState({ playing: this.state.loop });
-  };
-
-  handleDuration = duration => {
-    console.log('onDuration', duration);
-    this.setState({ duration });
-  };
-
   annotateVideo = async () => {
+    this.player.pause();
+
     const { value } = this.state;
+    const duration = this.player.duration;
     const { doc, annotatedList } = this;
     const data = {
       text: value,
@@ -113,6 +66,10 @@ class App extends Component {
       durationBefore: 0,
       durationAfter: 0
     };
+    data.durationBefore = data.timestamp - 30;
+    if (data.durationBefore < 0) data.durationBefore = 0;
+    data.durationAfter = data.timestamp + 30;
+    if (data.durationAfter > duration) data.durationAfter = duration;
     annotatedList.push(data);
     try {
       console.log(doc);
@@ -125,8 +82,13 @@ class App extends Component {
 
   handleSelect = selectedIndex => {
     const { annotatedList } = this;
-    this.player.seekTo(annotatedList[selectedIndex].timestamp);
+    this.player.seekTo(annotatedList[selectedIndex].durationBefore);
     this.setState({ selectedIndex });
+    this.player.play();
+  };
+
+  handleDuration = duration => {
+    this.setState({ duration });
   };
 
   ref = player => {
@@ -134,38 +96,42 @@ class App extends Component {
   };
 
   render() {
-    const {
-      // doc,
-      playing,
-      selectedIndex,
-      loaded,
-      played,
-      duration
-    } = this.state;
+    const { selectedIndex } = this.state;
+    let loaded = 0,
+      played = 0,
+      duration = 0;
+    if (this.state.loaded) {
+      loaded = this.player.loaded;
+      played = this.player.played;
+      duration = this.player.duration;
+    }
     const { url, annotatedList } = this;
-
+    /*
+    https://r1---sn-q4fl6nlr.c.drive.google.com/videoplayback?expire=1578691947&ei=KrUYXu-EOMmn0AWrjKUg&ip=98.194.51.1&cp=QVNMWkdfUFlSSFhOOms0RmhMSWJKbWVoYzUyank2bzhPZG42ZDFGczdvN0hiR0VMcWZaUHNNMTU&id=fd5a98fd9ab46f3a&itag=18&source=webdrive&requiressl=yes&mm=30&mn=sn-q4fl6nlr&ms=nxu&mv=m&mvi=0&pl=15&ttl=transient&susc=dr&driveid=10WYgwOVz00VOt_dbnuAKc0Iokr6fr1r3&app=explorer&mime=video/mp4&dur=407.278&lmt=1576185682206117&mt=1578677439&sparams=expire,ei,ip,cp,id,itag,source,requiressl,ttl,susc,driveid,app,mime,dur,lmt&sig=ALgxI2wwRgIhAPAKcj_gs82qqNnRubYR95zE9n3ZeGQm2U_2FL4p8ufyAiEAhI0fFCP3aBwW3KFtvcpHnZfUHCR89q2ckwBtCHUVSEk=&lsparams=mm,mn,ms,mv,mvi,pl&lsig=AHylml4wRQIgUdrFo7FxkAVjPIPguoxoyPU8vhgeFRd45s57HV6lywoCIQD0QKP6Ngu_58aE260rS1tNHM1oaGMqGGbdQb8eqhsvSQ==&cpn=wSfBMNmn6XCVVCJk&c=WEB_EMBEDDED_PLAYER&cver=20200108
+    https://drive.google.com/uc?export=download&id=10WYgwOVz00VOt_dbnuAKc0Iokr6fr1r3
+    https://drive.google.com/open?id=10WYgwOVz00VOt_dbnuAKc0Iokr6fr1r3
+    */
     return (
       <Grid>
         <Row>
           <Cell columns={12}>
-            <ReactPlayer
+            <VideoPlayer
               width="100%"
               ref={this.ref}
               controls={true}
               url={url}
-              playing={playing}
-              onReady={() => console.log('onReady')}
-              onStart={() => console.log('onStart')}
-              onPlay={this.handlePlay}
-              onPause={this.handlePause}
-              onBuffer={() => console.log('onBuffer')}
-              onSeek={e => console.log('onSeek', e)}
-              onEnded={this.handleEnded}
-              onError={e => console.log('onError', e)}
-              onProgress={this.handleProgress}
+              onReady={() => this.setState({ loaded: true })}
+              // onStart={() => console.log('onStart')}
+              // onPlay={this.handlePlay}
+              // onPause={this.handlePause}
+              // onBuffer={() => console.log('onBuffer')}
+              // onSeek={e => console.log('onSeek', e)}
+              // onEnded={this.handleEnded}
+              // onError={e => console.log('onError', e)}
+              // onProgress={this.handleProgress}
               onDuration={this.handleDuration}
             />
-            <IconButton
+            {/* <IconButton
               style={{
                 position: 'absolute',
                 color: 'yellow',
@@ -173,7 +139,7 @@ class App extends Component {
               }}
             >
               <MaterialIcon icon="bookmark" />
-            </IconButton>
+            </IconButton> */}
           </Cell>
           <Cell columns={12}>
             <Duration seconds={duration}></Duration>
@@ -223,6 +189,7 @@ class App extends Component {
                       onChange={e =>
                         this.setState({ value: e.currentTarget.value })
                       }
+                      onKeyDown={() => this.player.pause()}
                     />
                   </TextField>
                   <Button onClick={this.annotateVideo} type="submit">
@@ -241,12 +208,14 @@ class App extends Component {
                       <ListItem key={i}>
                         <ListItemText
                           primaryText={v.text}
-                          secondaryText={durationFormat(v.timestamp)}
+                          secondaryText={`${durationFormat(
+                            v.durationBefore
+                          )} - ${durationFormat(v.durationAfter)}`}
                         />
                         <ListItemMeta
-                          meta={`${((v.timestamp / duration) * 100).toFixed(
-                            2
-                          )}%`}
+                          meta={durationFormat(
+                            v.durationAfter - v.durationBefore
+                          )}
                         />
                       </ListItem>
                     );
