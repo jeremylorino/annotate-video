@@ -18,51 +18,58 @@ import List, {
 import LinearProgress from '@material/react-linear-progress';
 
 class App extends Component {
-  state = {
-    url:
-      'https://archive.org/download/BigBuckBunny_124/Content/big_buck_bunny_720p_surround.mp4',
-    playing: false,
-    duration: 0,
-    seeking: null,
-    played: 0,
-    loaded: 0,
-    value: '',
-    selectedIndex: null,
-    annotatedList: [
-      {
-        primaryText: 'stretching',
-        timestamp: 50,
-        durationBefore: 0,
-        durationAfter: 0
+  constructor(props) {
+    super(props);
+
+    this.state = {
+      doc: {
+        id: null,
+        data: () => {
+          return { url: null, annotatedList: [] };
+        }
       },
-      {
-        primaryText: 'smelling flowers',
-        timestamp: 75,
-        durationBefore: 0,
-        durationAfter: 0
-      },
-      {
-        primaryText: 'looking at tree',
-        timestamp: 90,
-        durationBefore: 0,
-        durationAfter: 0
-      },
-      {
-        primaryText: 'squirrel in the headlights',
-        timestamp: 336,
-        durationBefore: 0,
-        durationAfter: 0
-      }
-    ]
-  };
+      playing: false,
+      duration: 0,
+      seeking: null,
+      played: 0,
+      loaded: 0,
+      value: '',
+      selectedIndex: null
+    };
+
+    const { firebase } = this.props;
+    const db = firebase.db;
+
+    db.doc('videos/F1v1YAxhPxPrNLSiaspK').onSnapshot(doc => {
+      console.log(`${doc.id} =>`, doc.data());
+      this.setState({
+        doc,
+        url: doc.data().url,
+        annotatedList: doc.data().annotatedList
+      });
+    });
+  }
+
+  get doc() {
+    return this.state.doc;
+  }
+
+  get url() {
+    return this.state.doc.data().url;
+  }
+
+  get annotatedList() {
+    const { annotatedList } = this.state.doc.data();
+    return annotatedList.sort((a, b) => a.timestamp - b.timestamp);
+  }
 
   handlePlay = () => {
-    console.log('onPlay');
+    // console.log('onPlay');
     this.setState({ playing: true });
   };
 
   handlePause = () => {
-    console.log('onPause');
+    // console.log('onPause');
     this.setState({ playing: false });
   };
 
@@ -80,7 +87,7 @@ class App extends Component {
   };
 
   handleProgress = state => {
-    console.log('onProgress', state);
+    // console.log('onProgress', state);
     // We only want to update time slider if we are not currently seeking
     if (!this.state.seeking) {
       this.setState(state);
@@ -88,7 +95,7 @@ class App extends Component {
   };
 
   handleEnded = () => {
-    console.log('onEnded');
+    // console.log('onEnded');
     this.setState({ playing: this.state.loop });
   };
 
@@ -97,19 +104,27 @@ class App extends Component {
     this.setState({ duration });
   };
 
-  annotateVideo = () => {
-    const { annotatedList, value } = this.state;
+  annotateVideo = async () => {
+    const { value } = this.state;
+    const { doc, annotatedList } = this;
     const data = {
-      primaryText: value,
-      timestamp: this.player.getCurrentTime()
+      text: value,
+      timestamp: this.player.getCurrentTime(),
+      durationBefore: 0,
+      durationAfter: 0
     };
-    console.log('onAnnotate', data);
     annotatedList.push(data);
-    this.setState({ annotatedList, value: '' });
+    try {
+      console.log(doc);
+      await doc.ref.update({ annotatedList });
+      this.setState({ value: '' });
+    } catch (err) {
+      console.error(err);
+    }
   };
 
   handleSelect = selectedIndex => {
-    const { annotatedList } = this.state;
+    const { annotatedList } = this;
     this.player.seekTo(annotatedList[selectedIndex].timestamp);
     this.setState({ selectedIndex });
   };
@@ -120,14 +135,15 @@ class App extends Component {
 
   render() {
     const {
-      url,
+      // doc,
       playing,
-      annotatedList,
       selectedIndex,
       loaded,
       played,
       duration
     } = this.state;
+    const { url, annotatedList } = this;
+
     return (
       <Grid>
         <Row>
@@ -224,7 +240,7 @@ class App extends Component {
                     return (
                       <ListItem key={i}>
                         <ListItemText
-                          primaryText={v.primaryText}
+                          primaryText={v.text}
                           secondaryText={durationFormat(v.timestamp)}
                         />
                         <ListItemMeta

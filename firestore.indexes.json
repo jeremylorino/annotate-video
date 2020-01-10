@@ -1,0 +1,19 @@
+{
+  "indexes": [
+    {
+      "collectionGroup": "selfplay",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "instance",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "created_on",
+          "order": "DESCENDING"
+        }
+      ]
+    }
+  ],
+  "fieldOverrides": []
+}
